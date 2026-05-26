@@ -1,0 +1,173 @@
+1. Built-in Middleware
+2. Global Middleware
+3. Logger Middleware
+4. Auth Middleware
+5. Role Middleware
+6. Validation Middleware
+7. Error Middleware
+8. Route Middleware
+9. 404 Middleware
+
+these all gonna be needed for Banking system
+
+
+
+
+
+//1. Built-in Middleware
+This middleware lets Express read JSON data from request body.
+
+In banking API, this is needed for:
+Register user
+Login user
+Create account
+Deposit money
+Withdraw money
+Transfer money
+Update profile
+
+
+
+
+
+//2. Global Middleware
+Global middleware runs for every request.
+
+In banking API, global middleware can be used for:
+Common request processing
+Adding common response headers
+Checking maintenance mode
+General app-level behavior
+
+
+
+
+
+//3. Logger Middleware
+Logger middleware records request method, URL, and time.
+
+Before route sends response, logger prints:
+Track deposits
+Track withdrawals
+Track transfers
+Debug route calls
+Monitor API usage
+
+You can see exactly which API was called.
+
+
+
+
+
+//4. Auth Middleware
+Auth middleware checks whether user is logged in.
+
+Used In Banking System For Protected customer routes:
+View own account
+Check balance
+Deposit money
+Withdraw money
+Transfer money
+View transaction history
+Update profile
+
+
+
+
+
+//5. Role Middleware
+Role middleware checks if logged-in user has correct role.
+
+Used In Banking System For :-
+
+1 = Admin-only routes:
+    
+    View all users
+    View all accounts
+    Freeze account
+    Unfreeze account
+    View all transactions
+    Delete suspicious account
+
+
+
+2 = Customer routes:
+    
+    View own balance
+    Transfer money
+    Withdraw money
+    Deposit money    
+
+
+
+
+
+//6. Validation Middleware
+Validation middleware checks request body before controller runs.
+
+Used In Banking System For
+Register validation
+Login validation
+Deposit amount validation
+Withdraw amount validation
+Transfer validation
+Create account validation
+
+
+Banking Use For transfer, validation will check:
+receiver account number required
+amount required
+amount must be positive
+sender and receiver cannot be same
+
+
+
+
+
+//7. Route Middleware
+Route middleware means middleware used only on selected routes.
+
+Used In Banking System For
+
+1 = Public routes:
+POST /api/auth/register
+POST /api/auth/login
+
+2 = Protected routes:
+GET /api/accounts/balance
+POST /api/transactions/deposit
+POST /api/transactions/withdraw
+POST /api/transactions/transfer
+
+3 = Admin routes:
+GET /api/admin/users
+PATCH /api/admin/accounts/:id/freeze
+
+
+
+
+
+//8. 404 Middleware
+404 middleware handles wrong API URLs.
+
+Used In Banking System For If someone calls:
+/api/wrong
+/api/accounts/unknown
+/api/transactionss
+
+
+
+
+
+//9. Error Middleware
+Error middleware handles unexpected errors in one place.
+
+Used In Banking System For
+MySQL query errors
+JWT errors
+Server crashes
+Transaction failures
+Duplicate email errors
+Insufficient balance errors if thrown as errors
+
+
