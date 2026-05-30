@@ -1,142 +1,189 @@
-const { accounts, transactions } = require("../DB/bankDB");
+const db = require("../config/db");
 
 const depositMoney = (req, res) => {
-    const account = accounts.find(acc => acc.userId === req.user.id);
+    const amount = Number(req.body.amount);
 
-    if (!account) {
-        return res.status(404).json({ message: "Account not found" });
-    }
+    db.query(
+        "SELECT * FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, accounts) => {
+            if (err)
+                return res.status(500).json({ error: err.message });
 
-    if (account.status !== "active") {
-        return res.status(403).json({ message: "Account is not active" });
-    }
+            if (accounts.length === 0)
+                return res.status(404).json({ message: "Account not found" });
 
-    account.balance += req.body.amount;
+            const account = accounts[0];
 
-    const transaction = {
-        id: transactions.length + 1,
-        accountId: account.id,
-        type: "deposit",
-        amount: req.body.amount,
-        description: "Money deposited",
-        createdAt: new Date().toISOString()
-    };
+            if (account.status !== "active")
+                return res.status(403).json({ message: "Account is not active" });
 
-    transactions.push(transaction);
+            const newBalance = Number(account.balance) + amount;
 
-    res.status(200).json({
-        message: "Deposit successful",
-        balance: account.balance,
-        transaction
-    });
+            db.query(
+                "UPDATE accounts SET balance = ? WHERE id = ?",
+                [newBalance, account.id],
+                (err) => {
+                    if (err)
+                        return res.status(500).json({ error: err.message });
+
+                    db.query(
+                        "INSERT INTO transactions (account_id, type, amount, description) VALUES (?, ?, ?, ?)",
+                        [account.id, "deposit", amount, "Money deposited"],
+                        (err, result) => {
+                            if (err)
+                                return res.status(500).json({ error: err.message });
+
+                            res.status(200).json({
+                                message: "Deposit successful",
+                                balance: newBalance,
+                                transactionId: result.insertId
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
 };
 
 const withdrawMoney = (req, res) => {
-    const account = accounts.find(acc => acc.userId === req.user.id);
+    const amount = Number(req.body.amount);
 
-    if (!account) {
-        return res.status(404).json({ message: "Account not found" });
-    }
+    db.query(
+        "SELECT * FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, accounts) => {
+            if (err)
+                return res.status(500).json({ error: err.message });
 
-    if (account.status !== "active") {
-        return res.status(403).json({ message: "Account is not active" });
-    }
+            if (accounts.length === 0)
+                return res.status(404).json({ message: "Account not found" });
 
-    if (account.balance < req.body.amount) {
-        return res.status(400).json({ message: "Insufficient balance" });
-    }
+            const account = accounts[0];
 
-    account.balance -= req.body.amount;
+            if (account.status !== "active")
+                return res.status(403).json({ message: "Account is not active" });
 
-    const transaction = {
-        id: transactions.length + 1,
-        accountId: account.id,
-        type: "withdraw",
-        amount: req.body.amount,
-        description: "Money withdrawn",
-        createdAt: new Date().toISOString()
-    };
+            if (Number(account.balance) < amount)
+                return res.status(400).json({ message: "Insufficient balance" });
 
-    transactions.push(transaction);
+            const newBalance = Number(account.balance) - amount;
 
-    res.status(200).json({
-        message: "Withdrawal successful",
-        balance: account.balance,
-        transaction
-    });
+            db.query(
+                "UPDATE accounts SET balance = ? WHERE id = ?",
+                [newBalance, account.id],
+                (err) => {
+                    if (err)
+                        return res.status(500).json({ error: err.message });
+
+                    db.query(
+                        "INSERT INTO transactions (account_id, type, amount, description) VALUES (?, ?, ?, ?)",
+                        [account.id, "withdraw", amount, "Money withdrawn"],
+                        (err, result) => {
+                            if (err)
+                                return res.status(500).json({ error: err.message });
+
+                            res.status(200).json({
+                                message: "Withdrawal successful",
+                                balance: newBalance,
+                                transactionId: result.insertId
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
 };
 
 const transferMoney = (req, res) => {
     const { receiverAccountNumber, amount } = req.body;
 
-    const senderAccount = accounts.find(acc => acc.userId === req.user.id);
-    const receiverAccount = accounts.find(acc => acc.accountNumber === receiverAccountNumber);
+    db.query(
+        "SELECT * FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, senderAccounts) => {
+            if (err)
+                return res.status(500).json({ error: err.message });
 
-    if (!senderAccount) {
-        return res.status(404).json({ message: "Sender account not found" });
-    }
+            if (senderAccounts.length === 0)
+                return res.status(404).json({ message: "Sender account not found" });
 
-    if (!receiverAccount) {
-        return res.status(404).json({ message: "Receiver account not found" });
-    }
+            const sender = senderAccounts[0];
 
-    if (senderAccount.accountNumber === receiverAccount.accountNumber) {
-        return res.status(400).json({ message: "Cannot transfer to same account" });
-    }
+            db.query(
+                "SELECT * FROM accounts WHERE account_number = ?",
+                [receiverAccountNumber],
+                (err, receiverAccounts) => {
+                    if (err)
+                        return res.status(500).json({ error: err.message });
 
-    if (senderAccount.status !== "active" || receiverAccount.status !== "active") {
-        return res.status(403).json({ message: "One of the accounts is frozen" });
-    }
+                    if (receiverAccounts.length === 0)
+                        return res.status(404).json({ message: "Receiver account not found" });
 
-    if (senderAccount.balance < amount) {
-        return res.status(400).json({ message: "Insufficient balance" });
-    }
+                    const receiver = receiverAccounts[0];
 
-    senderAccount.balance -= amount;
-    receiverAccount.balance += amount;
+                    if (Number(sender.balance) < Number(amount))
+                        return res.status(400).json({ message: "Insufficient balance" });
 
-    const debitTransaction = {
-        id: transactions.length + 1,
-        accountId: senderAccount.id,
-        type: "transfer_debit",
-        amount,
-        description: `Transfer to ${receiverAccount.accountNumber}`,
-        createdAt: new Date().toISOString()
-    };
+                    const senderBalance = Number(sender.balance) - Number(amount);
+                    const receiverBalance = Number(receiver.balance) + Number(amount);
 
-    transactions.push(debitTransaction);
+                    db.query(
+                        "UPDATE accounts SET balance = ? WHERE id = ?",
+                        [senderBalance, sender.id],
+                        (err) => {
+                            if (err)
+                                return res.status(500).json({ error: err.message });
 
-    const creditTransaction = {
-        id: transactions.length + 1,
-        accountId: receiverAccount.id,
-        type: "transfer_credit",
-        amount,
-        description: `Transfer from ${senderAccount.accountNumber}`,
-        createdAt: new Date().toISOString()
-    };
+                            db.query(
+                                "UPDATE accounts SET balance = ? WHERE id = ?",
+                                [receiverBalance, receiver.id],
+                                (err) => {
+                                    if (err)
+                                        return res.status(500).json({ error: err.message });
 
-    transactions.push(creditTransaction);
-
-    res.status(200).json({
-        message: "Transfer successful",
-        balance: senderAccount.balance,
-        transaction: debitTransaction
-    });
+                                    res.status(200).json({
+                                        message: "Transfer successful",
+                                        balance: senderBalance
+                                    });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
 };
 
 const getTransactionHistory = (req, res) => {
-    const account = accounts.find(acc => acc.userId === req.user.id);
+    db.query(
+        "SELECT * FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, accounts) => {
+            if (err)
+                return res.status(500).json({ error: err.message });
 
-    if (!account) {
-        return res.status(404).json({ message: "Account not found" });
-    }
+            if (accounts.length === 0)
+                return res.status(404).json({ message: "Account not found" });
 
-    const history = transactions.filter(t => t.accountId === account.id);
+            db.query(
+                "SELECT * FROM transactions WHERE account_id = ? ORDER BY created_at DESC",
+                [accounts[0].id],
+                (err, transactions) => {
+                    if (err)
+                        return res.status(500).json({ error: err.message });
 
-    res.status(200).json({
-        message: "Transaction history fetched successfully",
-        data: history
-    });
+                    res.status(200).json({
+                        message: "Transaction history fetched successfully",
+                        data: transactions
+                    });
+                }
+            );
+        }
+    );
 };
 
 module.exports = {

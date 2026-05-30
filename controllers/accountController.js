@@ -1,60 +1,118 @@
-const { accounts } = require("../DB/bankDB");
+const db = require("../config/db");
 const generateAccountNumber = require("../utils/generateAccountNumber");
 
 const createAccount = (req, res) => {
-    const existingAccount = accounts.find(acc => acc.userId === req.user.id);
 
-    if (existingAccount) {
-        return res.status(409).json({
-            message: "User already has a bank account"
-        });
-    }
+    db.query(
+        "SELECT * FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, result) => {
 
-    const newAccount = {
-        id: accounts.length + 1,
-        userId: req.user.id,
-        accountNumber: generateAccountNumber(accounts.length + 1),
-        balance: 0,
-        status: "active"
-    };
+            if (err) {
+                return res.status(500).json({
+                    message: "Database Error",
+                    error: err.message
+                });
+            }
 
-    accounts.push(newAccount);
+            if (result.length > 0) {
+                return res.status(409).json({
+                    message: "User already has a bank account"
+                });
+            }
 
-    res.status(201).json({
-        message: "Bank account created successfully",
-        data: newAccount
-    });
+            const accountNumber = generateAccountNumber(Date.now());
+
+            db.query(
+                `INSERT INTO accounts
+                (user_id, account_number, balance, status)
+                VALUES (?, ?, ?, ?)`,
+                [
+                    req.user.id,
+                    accountNumber,
+                    0,
+                    "active"
+                ],
+                (err, insertResult) => {
+
+                    if (err) {
+                        return res.status(500).json({
+                            message: "Database Error",
+                            error: err.message
+                        });
+                    }
+
+                    res.status(201).json({
+                        message: "Bank account created successfully",
+                        data: {
+                            id: insertResult.insertId,
+                            userId: req.user.id,
+                            accountNumber,
+                            balance: 0,
+                            status: "active"
+                        }
+                    });
+                }
+            );
+        }
+    );
 };
 
 const getMyAccount = (req, res) => {
-    const account = accounts.find(acc => acc.userId === req.user.id);
 
-    if (!account) {
-        return res.status(404).json({
-            message: "Account not found"
-        });
-    }
+    db.query(
+        "SELECT * FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, result) => {
 
-    res.status(200).json({
-        message: "Account fetched successfully",
-        data: account
-    });
+            if (err) {
+                return res.status(500).json({
+                    message: "Database Error",
+                    error: err.message
+                });
+            }
+
+            if (result.length === 0) {
+                return res.status(404).json({
+                    message: "Account not found"
+                });
+            }
+
+            res.status(200).json({
+                message: "Account fetched successfully",
+                data: result[0]
+            });
+        }
+    );
 };
 
 const getBalance = (req, res) => {
-    const account = accounts.find(acc => acc.userId === req.user.id);
 
-    if (!account) {
-        return res.status(404).json({
-            message: "Account not found"
-        });
-    }
+    db.query(
+        "SELECT account_number, balance, status FROM accounts WHERE user_id = ?",
+        [req.user.id],
+        (err, result) => {
 
-    res.status(200).json({
-        accountNumber: account.accountNumber,
-        balance: account.balance,
-        status: account.status
-    });
+            if (err) {
+                return res.status(500).json({
+                    message: "Database Error",
+                    error: err.message
+                });
+            }
+
+            if (result.length === 0) {
+                return res.status(404).json({
+                    message: "Account not found"
+                });
+            }
+
+            res.status(200).json({
+                accountNumber: result[0].account_number,
+                balance: result[0].balance,
+                status: result[0].status
+            });
+        }
+    );
 };
 
 module.exports = {

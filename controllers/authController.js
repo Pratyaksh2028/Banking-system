@@ -1,61 +1,99 @@
-const { users } = require("../DB/bankDB");
+const db = require("../config/db");
 
 const registerUser = (req, res) => {
+
     const { name, email, password } = req.body;
 
-    const existingUser = users.find(user => user.email === email);
+    db.query(
+        "SELECT * FROM users WHERE email = ?",
+        [email],
+        (err, result) => {
 
-    if (existingUser) {
-        return res.status(409).json({
-            message: "Email already registered"
-        });
-    }
+            if (err) {
+                return res.status(500).json({
+                    message: "Database Error",
+                    error: err.message
+                });
+            }
 
-    const newUser = {
-        id: users.length + 1,
-        name,
-        email,
-        password,
-        role: "customer"
-    };
+            if (result.length > 0) {
+                return res.status(409).json({
+                    message: "Email already registered"
+                });
+            }
 
-    users.push(newUser);
+            db.query(
+                `INSERT INTO users
+                (name, email, password, role)
+                VALUES (?, ?, ?, ?)`,
+                [name, email, password, "customer"],
+                (err, insertResult) => {
 
-    res.status(201).json({
-        message: "User registered successfully",
-        data: {
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email,
-            role: newUser.role
+                    if (err) {
+                        return res.status(500).json({
+                            message: "Database Error",
+                            error: err.message
+                        });
+                    }
+
+                    res.status(201).json({
+                        message: "User registered successfully",
+                        data: {
+                            id: insertResult.insertId,
+                            name,
+                            email,
+                            role: "customer"
+                        }
+                    });
+                }
+            );
         }
-    });
+    );
 };
 
 const loginUser = (req, res) => {
+
     const { email, password } = req.body;
 
-    const user = users.find(u => u.email === email && u.password === password);
+    db.query(
+        "SELECT * FROM users WHERE email = ? AND password = ?",
+        [email, password],
+        (err, result) => {
 
-    if (!user) {
-        return res.status(401).json({
-            message: "Invalid email or password"
-        });
-    }
+            if (err) {
+                return res.status(500).json({
+                    message: "Database Error",
+                    error: err.message
+                });
+            }
 
-    const tokenPrefix = user.role === "admin" ? "admin" : "user";
-    const token = `${tokenPrefix}-${user.id}`;
+            if (result.length === 0) {
+                return res.status(401).json({
+                    message: "Invalid email or password"
+                });
+            }
 
-    res.status(200).json({
-        message: "Login successful",
-        token,
-        user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role
+            const user = result[0];
+
+            const tokenPrefix =
+                user.role === "admin"
+                    ? "admin"
+                    : "user";
+
+            const token = `${tokenPrefix}-${user.id}`;
+
+            res.status(200).json({
+                message: "Login successful",
+                token,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                }
+            });
         }
-    });
+    );
 };
 
 module.exports = {
